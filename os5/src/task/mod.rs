@@ -31,6 +31,7 @@ pub use processor::{
     current_task, current_trap_cx, current_user_token, run_tasks, schedule, take_current_task,
     get_tcb_ref_mut, get_current_task_info, update_current_task_syscall
 };
+use crate::config::BIG_STRIDE;
 
 /// Make current task suspended and switch to the next task
 pub fn suspend_current_and_run_next() {
@@ -42,6 +43,7 @@ pub fn suspend_current_and_run_next() {
     let task_cx_ptr = &mut task_inner.task_cx as *mut TaskContext;
     // Change status to Ready
     task_inner.task_status = TaskStatus::Ready;
+
     drop(task_inner);
     // ---- release current PCB
 

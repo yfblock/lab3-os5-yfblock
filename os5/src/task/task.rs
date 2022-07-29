@@ -2,15 +2,45 @@
 
 use super::TaskContext;
 use super::{pid_alloc, KernelStack, PidHandle};
-use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT};
+use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM, TRAP_CONTEXT};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use core::cmp::Ordering;
 use crate::syscall::TaskInfo;
 use crate::timer::{get_time, time_to_ms};
+
+#[derive(Copy, Clone)]
+pub struct StridePass(pub usize);
+
+impl Eq for StridePass {}
+
+impl Ord for StridePass {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl PartialOrd for StridePass {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.0.cmp(&other.0))
+    }
+}
+
+impl PartialEq for StridePass {
+    fn eq(&self, other: &Self) -> bool {
+        false
+    }
+}
+
+impl StridePass {
+    pub fn step(&mut self, stride: usize) {
+        self.0 = self.0.wrapping_add(stride);
+    }
+}
 
 /// Task control block structure
 ///
@@ -50,8 +80,8 @@ pub struct TaskControlBlockInner {
     pub exit_code: i32,
     pub task_syscall_times: [u32; MAX_SYSCALL_NUM],      // record the number of system calls
     pub task_start_time: usize,
-    pub pass: isize,
-    pub prio: isize,
+    pub pass: StridePass,
+    pub stride: usize,
 }
 
 /// Simple access to its internal fields
@@ -111,8 +141,8 @@ impl TaskControlBlock {
                     exit_code: 0,
                     task_start_time: 0,
                     task_syscall_times: [0; MAX_SYSCALL_NUM],
-                    pass: 0,
-                    prio: 0,
+                    pass: StridePass(0),
+                    stride: BIG_STRIDE / 16
                 })
             },
         };
@@ -182,8 +212,8 @@ impl TaskControlBlock {
                     exit_code: 0,
                     task_start_time: 0,
                     task_syscall_times: [0; MAX_SYSCALL_NUM],
-                    pass: 0,
-                    prio: 0
+                    pass: parent_inner.pass,
+                    stride: parent_inner.stride
                 })
             },
         });
@@ -211,9 +241,9 @@ impl TaskControlBlock {
 
         task_control_block
     }
-    pub fn set_priority(self: &Arc<TaskControlBlock>, prio: isize) {
+    pub fn set_priority(self: &Arc<TaskControlBlock>, prio: usize) {
         let mut inner = self.inner_exclusive_access();
-        inner.prio = prio;
+        inner.stride = BIG_STRIDE / prio;
     }
 
 
