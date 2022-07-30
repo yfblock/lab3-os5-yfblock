@@ -5,7 +5,7 @@ use crate::mm::{MapPermission, translated_refmut, translated_str, VirtAddr};
 use crate::task::{add_task, current_task, current_user_token, exit_current_and_run_next, get_current_task_info, get_tcb_ref_mut, suspend_current_and_run_next, TaskStatus};
 use crate::timer::get_time_us;
 use alloc::sync::Arc;
-use crate::config::{MAX_SYSCALL_NUM, PAGE_SIZE};
+use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM, PAGE_SIZE};
 
 #[repr(C)]
 #[derive(Debug)]

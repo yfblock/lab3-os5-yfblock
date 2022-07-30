@@ -13,32 +13,58 @@ use core::cmp::Ordering;
 use crate::syscall::TaskInfo;
 use crate::timer::{get_time, time_to_ms};
 
-#[derive(Copy, Clone)]
-pub struct StridePass(pub usize);
+// impl Eq for TaskControlBlock {}
+//
+// impl Ord for TaskControlBlock {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         self.partial_cmp(other).unwrap()
+//     }
+// }
+//
+// impl PartialOrd for TaskControlBlock {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         let inner = self.inner_exclusive_access();
+//         let other_inner = other.inner_exclusive_access();
+//         Some(inner.pass.cmp(&other_inner.pass))
+//     }
+// }
+//
+// impl PartialEq for TaskControlBlock {
+//     fn eq(&self, other: &Self) -> bool {
+//         let inner = self.inner_exclusive_access();
+//         let other_inner = other.inner_exclusive_access();
+//         inner.pass == other_inner.pass
+//     }
+// }
 
-impl Eq for StridePass {}
+impl Eq for TaskControlBlock {
 
-impl Ord for StridePass {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
-    }
 }
 
-impl PartialOrd for StridePass {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.0.cmp(&other.0))
-    }
-}
-
-impl PartialEq for StridePass {
+impl PartialEq for TaskControlBlock {
     fn eq(&self, other: &Self) -> bool {
-        false
+        self.pid.0 == other.pid.0
     }
 }
 
-impl StridePass {
-    pub fn step(&mut self, stride: usize) {
-        self.0 = self.0.wrapping_add(stride);
+impl Ord for TaskControlBlock {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let lpass = self.inner_exclusive_access().pass;
+        let rpass = other.inner_exclusive_access().pass;
+        rpass.cmp(&lpass)
+    }
+}
+
+impl PartialOrd for TaskControlBlock {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl TaskControlBlock {
+    pub fn step(&self) {
+        let mut inner = self.inner_exclusive_access();
+        inner.pass = inner.pass.wrapping_add(inner.stride);
     }
 }
 
@@ -80,7 +106,7 @@ pub struct TaskControlBlockInner {
     pub exit_code: i32,
     pub task_syscall_times: [u32; MAX_SYSCALL_NUM],      // record the number of system calls
     pub task_start_time: usize,
-    pub pass: StridePass,
+    pub pass: usize,
     pub stride: usize,
 }
 
@@ -141,7 +167,7 @@ impl TaskControlBlock {
                     exit_code: 0,
                     task_start_time: 0,
                     task_syscall_times: [0; MAX_SYSCALL_NUM],
-                    pass: StridePass(0),
+                    pass: 0,
                     stride: BIG_STRIDE / 16
                 })
             },
