@@ -45,4 +45,7 @@ jobs:
           cd qemu-7.0.0
           sudo make install
           qemu-system-riscv64 --version
+      - name: Run
+        run: |
+          make test5
 #      - uses: education/autograding@v1
