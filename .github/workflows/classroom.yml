@@ -25,11 +25,13 @@ jobs:
           version: latest
           use-tool-cache: true
       - name: Cache QEMU
+        id: qemu
         uses: actions/cache@v3
         with:
           path: qemu-7.0.0
           key: qemu-7.0.0-x86_64-riscv64
-      - name: Install QEMU
+      - name: Compile QEMU
+        if: steps.qemu.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install ninja-build -y
@@ -42,6 +44,8 @@ jobs:
           else
             cd qemu-7.0.0
           fi
+      - name: Install QEMU
+        run: |
           sudo make install
           qemu-system-riscv64 --version
       - uses: education/autograding@v1
